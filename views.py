@@ -234,3 +234,60 @@ class GenerarEmpleadosPensionesAlimenticiasView(LoginRequiredMixin, NeverCacheMi
         pdf = buffer.getvalue()
         response.write(pdf)
         return response
+
+
+
+@login_required(login_url='/login')
+def listar_menores(request):
+    d = date.today()
+    actual = str(d)
+    a = actual[:4]
+    m = actual[5:7]
+    dias = actual[8:10]
+    print(dias)
+    p = CatEmpleados.objects.get(usuario_id=request.user.id)
+    queryset = CatMenor.objects.all().order_by('-id')
+    menor_lista = []
+    headers_menor = {"Authorization": settings.TOKEN_PUC}
+    for menor in queryset:
+        if menor.puc_persona_id:
+            param = {'puc_persona_id': menor.puc_persona_id}
+            r = requests.get(settings.PUC + '/api/persona/?', params=param, headers=headers_menor)
+            if r.status_code == 200:
+                respuesta = r.json()
+                if respuesta:
+                    for x in respuesta['results']:
+                        print(x['id'], x['nombre'], x['apellido_paterno'], x['apellido_materno'])
+                        nombre_persona = '%s %s %s' % (
+                            x['nombre'], x['apellido_paterno'], x['apellido_materno']
+                        )
+                        curp = (x['curp'])
+                        genero = (x['genero'])
+                        fecha = (x['fecha_nacimiento'])
+                        print(fecha)
+                        nacimiento = fecha[:4]
+                        mes = fecha[5:7]
+                        dia = fecha[8:10]
+                        if a == nacimiento:
+                            edad = (int(m) - int(mes))
+                            if edad == 0 or edad == 1:
+                                edad = str(str(1) + " MES")
+                                if mes == m:
+                                    edad = (int(dias) - int(dia))
+                                    edad = str(str(edad) + " DIAS")
+                            else:
+                                edad = str(str(edad) + " MESES")
+                        else:
+                            edad = (int(a) - int(nacimiento))
+                            if edad == 1:
+                                edad = str(str(edad) + " AÑO")
+                            else:
+                                edad = str(str(edad) + " AÑOS")
+
+                        menor_lista.append({'nombre_persona': nombre_persona,
+                                            'menor': menor,
+                                            'curp': curp,
+                                            'genero': genero,
+                                            'edad': edad})
+                        queryset = menor_lista
+    return render(request, 'consulta_menores.html', {'p': p, 'menor_lista': menor_lista})
